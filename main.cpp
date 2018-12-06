@@ -295,28 +295,45 @@ void taskRemove() {
 void taskEnlarge() {
     string root = "ImagesToEnlarge/";
     string rootOut = "ImagesEnlarged/";
-    string files[]{"1.jpg"};
+    string files[]{"4.jpg"};
     rep(i, 1) {
         auto img = imread(root + files[i]);
-        auto ref = imread(root + "mask_" + files[i]);
-        Mat mask0(img.rows, img.cols, CV_64F);
-        rep(r, img.rows) rep(c, img.cols) {
-                //print(ref.at<Vec3b>(r, c));
-                if (!isWhite(ref.at<Vec3b>(r, c)))
-                    mask0.at<double>(r, c) = -999999;
-            }
-        Mat *mask = &mask0;
-        auto tmp = getSeamsToEnd(img, mask);
+        int rows = img.rows, cols = img.cols, n = int(cols * 0.2);
+        auto tmp = getMultiSeams(img, n);
+
         auto seamsV = tmp.first;
-        auto imgDraw = drawSeamsV(img, seamsV);
+
+        vector <pair<int, int>> candi;
+        rep(i, n) candi.emplace_back(make_pair(seamsV.at<int>(rows - 1, i), i));
+        sort(candi.begin(), candi.end());
+
+        Mat imgNew(rows, cols + n, CV_8UC3);
+        rep(r, rows) rep(c, cols) imgNew.at<Vec3b>(r, c) = img.at<Vec3b>(r, c);
+
+        imwrite("x.bmp", imgNew);
+
+        rep(ii, n) {
+            int iii = candi[ii].second;
+            rep(r, rows) {
+                int pos = seamsV.at<int>(r, iii);
+                for (int c = imgNew.cols - 1; c >= pos + 1; c--)
+                    imgNew.at<Vec3b>(r, c) = imgNew.at<Vec3b>(r, c - 1);
+                imgNew.at<Vec3b>(r, pos) = Vec3b((Vec3f(imgNew.at<Vec3b>(r, pos)) + Vec3f(imgNew.at<Vec3b>(r, pos - 1))) / 2);
+            }
+            //imwrite(to_string(ii) + "x.bmp", imgNew);
+            for (int j = ii + 1; j < n; j++) rep(r, rows) seamsV.at<int>(r, candi[j].second)++;
+        }
+
+        imwrite(rootOut + "enlarged_" + files[i], imgNew);
+
+        auto imgDraw = drawSeamsV(imgNew, seamsV);
 
         imwrite(rootOut + "seams_" + files[i], imgDraw);
-        auto imgNew = tmp.second;
-        imwrite(rootOut + "removed_" + files[i], imgNew);
+
     }
 }
 
 
 int main() {
-    taskRemove();
+    taskEnlarge();
 }
